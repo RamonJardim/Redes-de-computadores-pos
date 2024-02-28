@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Scanner;
 
-class ParallelSender extends Thread {
+class ParallelSender extends Thread { // Envia os pacotes em paralelo
   private Channel channel;
   private DatagramPacket packet;
 
@@ -30,7 +30,7 @@ class ParallelSender extends Thread {
   }
 }
 
-class ACKListener extends Thread {
+class ACKListener extends Thread { // Recebe os ACKs em paralelo
   private Channel channel;
 
   public ACKListener(Channel channel) {
@@ -58,14 +58,14 @@ class ACKListener extends Thread {
   }
 }
 
-public class Client {
+public class Client { // Cliente UDP
   private static final int DEFAULT_CLIENT_PORT = 9876;
   private static final int DEFAULT_SERVER_PORT = 4321;
 
   private static Scanner sc = new Scanner(System.in);
   private static Scanner scInt = new Scanner(System.in);
 
-  public static void main(String[] args) {
+  public static void main(String[] args) { // Faz as leituras de ip e portas e envia os pacotes
     System.out.printf("Digite a porta do cliente (%d): ", DEFAULT_CLIENT_PORT);
     String clientPortString = sc.nextLine();
     int clientPort = clientPortString.equals("") ? DEFAULT_CLIENT_PORT : Integer.parseInt(clientPortString);

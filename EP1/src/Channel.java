@@ -51,9 +51,9 @@ class Config { // Classe para representar arquivo de configuração
   }
 }
 
-public class Channel extends DatagramSocket {
+public class Channel extends DatagramSocket { // Canal de comunicação
 
-  class ACKSender extends Thread {
+  class ACKSender extends Thread { // Envia os ACKs em paralelo
     private Channel channel;
     private int seqNumber;
     private DatagramPacket p;
