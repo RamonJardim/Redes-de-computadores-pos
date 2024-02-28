@@ -52,6 +52,39 @@ class Config { // Classe para representar arquivo de configuração
 }
 
 public class Channel extends DatagramSocket {
+
+  class ACKSender extends Thread {
+    private Channel channel;
+    private int seqNumber;
+    private DatagramPacket p;
+  
+    public ACKSender(Channel channel, int seqNumber, DatagramPacket p) {
+      this.channel = channel;
+      this.seqNumber = seqNumber;
+      this.p = p;
+    }
+
+    @Override
+    public void run() {
+      try {
+        this.sendACK();
+      } catch (IOException e) {
+        System.out.println("Erro ao receber ACK");
+        e.printStackTrace();
+      }
+    }
+  
+    private void sendACK() throws IOException {
+      try {
+        channel.sendACK(p, seqNumber);
+      } catch (Exception e) {
+        System.out.println("Erro ao enviar ACK");
+        e.printStackTrace();
+      }
+    }
+  }
+
+
   private Config config;
   private Random random = new Random();
   private int sequenceNumber = 1;
@@ -165,7 +198,9 @@ public class Channel extends DatagramSocket {
       incrementCount(receiveDuplicateCount, getClientKey(p));
     } else {
       seqNumList.add(seqNumberInt);
-      if(!messageString.equals("ACK")) this.sendACK(p, seqNumberInt); // Envia o ACK
+      if(!messageString.equals("ACK")) {
+        new ACKSender(this, seqNumberInt, p).start(); // Envia o ACK
+      }
     }
 
     return messageString;
