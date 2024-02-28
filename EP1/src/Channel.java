@@ -188,7 +188,7 @@ public class Channel extends DatagramSocket {
       return messageString;
     }
 
-    if(seqNumberMap.get(getClientKey(p)) == null) {
+    if(seqNumberMap.getOrDefault(getClientKey(p), null) == null) {
       seqNumberMap.put(getClientKey(p), new ArrayList<Integer>());
     }
 
@@ -285,12 +285,12 @@ public class Channel extends DatagramSocket {
   }
 
   private void consolidateSent(String key) { // Consolida as estatísticas de envio
-    System.out.printf("Total de mensagens enviadas: %d%n", sendCount.get(key) == null ? 0 : sendCount.get(key));
-    System.out.printf("Total de mensagens eliminadas: %d%n", eliminateCount.get(key) == null ? 0 : eliminateCount.get(key));
-    // System.out.printf("Total de mensagens atrasadas: %d%n", delayCount.get(key) == null ? 0 : delayCount.get(key));
-    System.out.printf("Total de mensagens duplicadas: %d%n", duplicateCount.get(key) == null ? 0 : duplicateCount.get(key));
-    System.out.printf("Total de mensagens corrompidas: %d%n", corruptCount.get(key) == null ? 0 : corruptCount.get(key));
-    System.out.printf("Total de mensagens cortadas: %d%n", cutCount.get(key) == null ? 0 : cutCount.get(key));
+    System.out.printf("Total de mensagens enviadas: %d%n", sendCount.getOrDefault(key, 0));
+    System.out.printf("Total de mensagens eliminadas: %d%n", eliminateCount.getOrDefault(key, 0));
+    // System.out.printf("Total de mensagens atrasadas: %d%n", delayCount.getOrDefault(key, 0));
+    System.out.printf("Total de mensagens duplicadas: %d%n", duplicateCount.getOrDefault(key, 0));
+    System.out.printf("Total de mensagens corrompidas: %d%n", corruptCount.getOrDefault(key, 0));
+    System.out.printf("Total de mensagens cortadas: %d%n", cutCount.getOrDefault(key, 0));
 
     sendCount.put(key, 0);
     eliminateCount.put(key, 0);
@@ -301,11 +301,11 @@ public class Channel extends DatagramSocket {
   }
 
   private void consolidateReceived(String key) { // Consolida as estatísticas de recebimento
-    ArrayList<Integer> seqNumlist = seqNumberMap.get(key);
-    System.out.printf("Total de mensagens recebidas: %d%n", receivedCount.get(key) == null ? 0 : receivedCount.get(key));
-    System.out.printf("Total de mensagens perdidas (Sequence Number não encontrado): %d%n", seqNumlist == null ? 0 : countMissingMessages(seqNumlist) - receivedWithFailedIntegrityCount.get(key));
-    System.out.printf("Total de mensagens duplicadas: %d%n", receiveDuplicateCount.get(key) == null ? 0 : receiveDuplicateCount.get(key));
-    System.out.printf("Total de mensagens corrompidas/cortadas (checksum falhou): %d%n", receivedWithFailedIntegrityCount.get(key) == null ? 0 : receivedWithFailedIntegrityCount.get(key));
+    ArrayList<Integer> seqNumlist = seqNumberMap.getOrDefault(key, new ArrayList<>());
+    System.out.printf("Total de mensagens recebidas: %d%n", receivedCount.getOrDefault(key, 0));
+    System.out.printf("Total de mensagens perdidas (Sequence Number não encontrado): %d%n", seqNumlist.size() == 0 ? 0 : countMissingMessages(seqNumlist) - receivedWithFailedIntegrityCount.getOrDefault(key, 0));
+    System.out.printf("Total de mensagens duplicadas: %d%n", receiveDuplicateCount.getOrDefault(key, 0));
+    System.out.printf("Total de mensagens corrompidas/cortadas (checksum falhou): %d%n", receivedWithFailedIntegrityCount.getOrDefault(key, 0));
 
     sendCount.put(key, 0);
     eliminateCount.put(key, 0);
