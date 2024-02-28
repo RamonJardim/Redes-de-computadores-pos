@@ -1,10 +1,10 @@
 {
-  "eliminateProbability": 5,
+  "eliminateProbability": 4,
   "delayProbability": 100,
   "delayMS": 80,
-  "duplicateProbability": 10,
+  "duplicateProbability": 3,
   "corruptBytes": 1,
-  "corruptProbability": 10,
+  "corruptProbability": 2,
   "cutProbability": 100,
   "cutBytes": 1024
 }
