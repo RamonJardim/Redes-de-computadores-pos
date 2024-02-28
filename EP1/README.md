@@ -6,8 +6,8 @@ O projeto foi desenvolvido utilizando o VSCode e deve funcionar de forma direta 
 
 Para iniciar o servidor:
 
-```javac -cp .\lib\gson-2.10.1.jar .\src\Server.java .\src\Channel.java .\src\Client.java -d .\bin; java -cp ".\lib\gson-2.10.1.jar;.\bin\" Server```
+```javac -cp ./lib/gson-2.10.1.jar ./src/Server.java ./src/Channel.java ./src/Client.java -d ./bin; java -cp "./lib/gson-2.10.1.jar:./bin/" Server```
 
 Para iniciar o cliente:
 
-```javac -cp .\lib\gson-2.10.1.jar .\src\Server.java .\src\Channel.java .\src\Client.java -d .\bin; java -cp ".\lib\gson-2.10.1.jar;.\bin\" Client```
+```javac -cp ./lib/gson-2.10.1.jar ./src/Server.java ./src/Channel.java ./src/Client.java -d ./bin; java -cp "./lib/gson-2.10.1.jar:./bin/" Client```

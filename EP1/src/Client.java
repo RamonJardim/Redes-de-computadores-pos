@@ -66,23 +66,23 @@ public class Client {
   private static Scanner scInt = new Scanner(System.in);
 
   public static void main(String[] args) {
-    InetAddress ipAddress = null;
-    try {
-      ipAddress = InetAddress.getByName("localhost");
-    } catch (UnknownHostException e) {
-      System.out.println("Erro ao buscar IP da máquina");
-      e.printStackTrace();
-      System.exit(1);
-    }
-
     System.out.printf("Digite a porta do cliente (%d): ", DEFAULT_CLIENT_PORT);
     String clientPortString = sc.nextLine();
     int clientPort = clientPortString.equals("") ? DEFAULT_CLIENT_PORT : Integer.parseInt(clientPortString);
 
 
-    System.out.println("Digite o IP do servidor (127.0.0.1): ");
+    System.out.print("Digite o IP do servidor (127.0.0.1): ");
     String serverIP = sc.nextLine();
     serverIP = serverIP.equals("") ? "127.0.0.1" : serverIP;
+
+    InetAddress ipAddress = null;
+    try {
+      ipAddress = InetAddress.getByName(serverIP);
+    } catch (UnknownHostException e) {
+      System.out.println("Erro ao buscar IP da máquina");
+      e.printStackTrace();
+      System.exit(1);
+    }
 
     System.out.printf("Digite a porta do servidor (%d): ", DEFAULT_SERVER_PORT);
     String serverPortString = sc.nextLine();
