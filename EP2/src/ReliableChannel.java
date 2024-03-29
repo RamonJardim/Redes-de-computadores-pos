@@ -166,10 +166,9 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
   private int sequenceNumber = 1;
   private boolean timeout = false;
 
-  private List<DatagramPacket> receivedDataPackets = Collections.synchronizedList(new ArrayList<>());
-  private List<DatagramPacket> sendingDataPackets = Collections.synchronizedList(new ArrayList<>());
-  private int nextseqnum = 0;
-  private int base = 0;
+  private List<DatagramPacket> sendingDataPackets = Collections.synchronizedList(new ArrayList<>()); // Buffer do remetente
+  private int nextseqnum = 1;
+  private int base = 1;
 
   private int expectedSeqNum = 1;
 
@@ -221,8 +220,6 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
         startTimer();
         this.timeout = false;
         sendWindow(true);
-      } else {
-        sendRange();
       }
     }
 
@@ -230,21 +227,23 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
   }
 
   private void sendWindow(boolean isRetransmission) throws IOException {
-    for(int i = base ; i < base + config.getWindowSize() && i < sendingDataPackets.size() ; i++) {
+    for(int i = base - 1 ; i < base + config.getWindowSize() && i < sendingDataPackets.size() ; i++) {
       DatagramPacket p = sendingDataPackets.get(i);
+      System.out.println("[Window] Enviando pacote " + (i+1));
       send(new DatagramPacket(p.getData().clone(), p.getLength(), p.getAddress(), p.getPort()), i, false);
       if(base == nextseqnum) {
         startTimer();
       }
-      if(!isRetransmission) nextseqnum++;
+      if(!isRetransmission) nextseqnum = i + 1;
     }
   }
 
   private void sendRange() throws IOException {
     for(int i = nextseqnum ; i < base + config.getWindowSize() && i < sendingDataPackets.size() ; i++) {
       DatagramPacket p = sendingDataPackets.get(i);
+      System.out.println("[Range] Enviando pacote " + i);
       send(new DatagramPacket(p.getData().clone(), p.getLength(), p.getAddress(), p.getPort()), i, false);
-      nextseqnum++;
+      nextseqnum = i + 1;
     }
   }
 
@@ -283,7 +282,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
 
     int sum = calculateChecksum(message, seqNumber);
     if(sum != ByteBuffer.wrap(checksum).getInt()) { // Verifica se o checksum está correto
-      logMessage(p, "Corrompida/cortada", true);
+      logMessage(p, redText("Corrompida/cortada"), true);
       incrementCount(receivedWithFailedIntegrityCount, getClientKey(p));
       return messageString;
     }
@@ -294,7 +293,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
 
     ArrayList<Integer> seqNumList = seqNumberMap.get(getClientKey(p));
     if(seqNumList.contains(seqNumberInt)) { // Verifica se a mensagem é duplicada
-      logMessage(p, "Duplicada", true);
+      logMessage(p, redText("Duplicada"), true);
       incrementCount(receiveDuplicateCount, getClientKey(p));
     } else {
       if(!isAck) {
@@ -302,13 +301,13 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
           seqNumList.add(seqNumberInt);
           expectedSeqNum++;
           new ACKSender(this, seqNumberInt, p).start(); // Envia o ACK do pacote recebido
-          logMessage(p, "Entregue", true);
+          logMessage(p, greenText("Entregue"), true);
         } else { // Se não for, adiciona o número de sequência ao mapa e não envia o ACK
-          new ACKSender(this, expectedSeqNum, p).start(); // Envia o ACK do próximo número de sequência esperado
-          logMessage(p, "Fora de ordem", true);
+          new ACKSender(this, expectedSeqNum - 1, p).start(); // Envia o ACK do próximo número de sequência esperado
+          logMessage(p, redText("Fora de ordem"), true);
         }
       } else {
-        this.base = seqNumberInt + 1 > this.base ? seqNumberInt + 1 : this.base;
+        this.base = seqNumberInt > this.base ? seqNumberInt : this.base;
       }
     }
 
@@ -327,7 +326,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     if(base == nextseqnum) {
       stopTimer(); // Para o timer se recebeu todos os ACKs da janela de envio
     } else {
-      sendWindow(false); // Envia pacotes dentro do avanço da janela
+      sendRange(); // Envia pacotes dentro do avanço da janela
       if(this.timer == null) {
         startTimer();
       } else {
@@ -371,7 +370,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
 
     if(eliminated) { // Verifica se a mensagem deve ser eliminada
       incrementCount(eliminateCount, getClientKey(p));
-      logMessage(p, "Eliminada", false);
+      logMessage(p, redText("Eliminada"), false);
       return;
     }
 
@@ -392,14 +391,14 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     }
 
     if(!eliminated && !delayed && !corrupted && !duplicated) {
-      logMessage(p, "Normal", false);
+      logMessage(p, greenText("Normal"), false);
     }
 
     super.send(p); // Envia a mensagem
   }
 
   private void delayMessage(DatagramPacket p) { // Método para atrasar a mensagem
-    logMessage(p, "Atrasada", false);
+    logMessage(p, redText("Atrasada"), false);
     try {
       Thread.sleep(config.getDelayMS());
       incrementCount(delayCount, getClientKey(p));
@@ -414,7 +413,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     byte[] data = p.getData();
     data[random.nextInt(data.length)] += 1;
     incrementCount(corruptCount, getClientKey(p));
-    logMessage(p, "Corrompida", false);
+    logMessage(p, redText("Corrompida"), false);
   }
 
   private void cutMessage(DatagramPacket p) { // Método para cortar a mensagem
@@ -427,12 +426,12 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
       p.setData(newData);
       p.setLength(newData.length);
       incrementCount(cutCount, getClientKey(p));
-      logMessage(p, "Cortada", false);
+      logMessage(p, redText("Cortada"), false);
     }
   }
 
   private void duplicateMessage(DatagramPacket p) throws IOException { // Método para duplicar a mensagem
-    logMessage(p, "Duplicada", false);
+    logMessage(p, redText("Duplicada"), false);
     super.send(p);
     incrementCount(duplicateCount, getClientKey(p));
   }
@@ -457,7 +456,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
   }
 
   private void logMessage(DatagramPacket p, String status, boolean received) {
-    System.out.printf("%s [%d]: %s - \"%s\"%n", received ? "Recebida" : "Enviada", getSegmentSeqNumber(p), status, getMessage(p));
+    System.out.printf("%s [%d]: %s - \"%s\"%n", received ? greenText("Recebida") : blueText("Enviada"), getSegmentSeqNumber(p), status, getMessage(p));
   }
 
   public void consolidateAll() { // Consolida todas as estatísticas
@@ -533,7 +532,27 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
 
   private String getMessage(DatagramPacket p) {
     byte[] data = p.getData();
-
+    byte[] isAckArray = Arrays.copyOfRange(data, 8, 12);
+    int isAck = ByteBuffer.wrap(isAckArray).getInt();
+    if(isAck == 1) {
+      return yellowText("ACK");
+    }
     return new String(Arrays.copyOfRange(data, 12, data.length), StandardCharsets.UTF_8);
+  }
+
+  private String redText(String text) {
+    return "\u001B[31m" + text + "\u001B[0m";
+  }
+
+  private String blueText(String text) {
+    return "\u001B[34m" + text + "\u001B[0m";
+  }
+
+  private String greenText(String text) {
+    return "\u001B[32m" + text + "\u001B[0m";
+  }
+
+  private String yellowText(String text) {
+    return "\u001B[33m" + text + "\u001B[0m";
   }
 }
