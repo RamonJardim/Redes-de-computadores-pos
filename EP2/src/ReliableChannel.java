@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.nio.ByteBuffer;
@@ -85,7 +86,6 @@ class ACKListener extends Thread { // Recebe os ACKs em paralelo
   private void receiveACK() throws IOException {
     while (true) {
       try {
-        channel.setSoTimeout(1000);
         channel.receiveACK();
       } catch (Exception e) {
         break;
@@ -133,9 +133,10 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
   private Random random = new Random();
   private int sequenceNumber = 1;
 
-  private ArrayList<DatagramPacket> receivedDataPackets = new ArrayList<>();
-  private ArrayList<DatagramPacket> sendingDataPackets = new ArrayList<>();
-  private int acknowlegedPackets = 0; // Número de pacotes que foram confirmados (efetivamente é o valor de base)
+  private List<DatagramPacket> receivedDataPackets = Collections.synchronizedList(new ArrayList<>());
+  private List<DatagramPacket> sendingDataPackets = Collections.synchronizedList(new ArrayList<>());
+  private int nextseqnum = 1;
+  private int base = 1;
 
   private ConcurrentHashMap<String, Integer> sendCount = new ConcurrentHashMap<>();
   private ConcurrentHashMap<String, Integer> eliminateCount = new ConcurrentHashMap<>();
@@ -153,6 +154,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
   public ReliableChannel(int port) throws SocketException {
     super(port);
     Gson gson = new Gson();
+
     try {
       this.config = gson.fromJson(Files.readString(Path.of("config.json")), Config.class); // Leitura do arquivo config.json
     } catch (IOException e) {
@@ -166,55 +168,22 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     return sequenceNumber++;
   }
 
-  public void send(DatagramPacket p, int sequenceNumber, boolean isAck) throws IOException { // Recebe pedidos de envio de segmentos UDP
-    incrementCount(sendCount, getClientKey(p));
-    byte[] messageBytes = p.getData();
-    int definedSequenceNumber;
-    if(sequenceNumber != -1) { // Se o número de sequência for diferente de -1, utiliza o número de sequência fornecido (para ACKs e retransmissões)
-      definedSequenceNumber = sequenceNumber;
-    } else { // Caso contrário, pega o próximo número de sequência
-      definedSequenceNumber = getSequenceNumber();
+  public void send(List<DatagramPacket> ps) throws IOException {
+    sendingDataPackets.addAll(ps);
+
+    int currentBase = base;
+
+    for(int i = currentBase ; i < currentBase + config.getWindowSize() && i < sendingDataPackets.size() ; i++) {
+      send(sendingDataPackets.get(i), -1, false);
+      startTimer(); // not sure how to implement this
     }
-
-    byte[] seqNumber = java.nio.ByteBuffer.allocate(4).putInt(definedSequenceNumber).array();
-
-    int sum = calculateChecksum(messageBytes, seqNumber);
-
-    byte[] checksum = java.nio.ByteBuffer.allocate(4).putInt(sum).array();
-    byte[] isAckBytes = java.nio.ByteBuffer.allocate(1).putInt(isAck ? 1 : 0).array();
-
-    byte[] data = new byte[checksum.length + seqNumber.length + isAckBytes.length + messageBytes.length];
-    System.arraycopy(checksum, 0, data, 0, checksum.length);  // Primeiros 4 bytes da mensagem representam o checksum
-    System.arraycopy(seqNumber, 0, data, checksum.length, seqNumber.length); // 4 Bytes seguintes representam o número de sequência
-    System.arraycopy(isAckBytes, 0, data, checksum.length + seqNumber.length, isAckBytes.length); // byte seguinte indica se é ack
-    System.arraycopy(messageBytes, 0, data, checksum.length + seqNumber.length + isAckBytes.length, messageBytes.length); // Restante da mensagem é o conteúdo de fato
-
-    p.setData(data);
-    p.setLength(data.length);
-
-    if(randomize(config.getEliminateProbability())) { // Verifica se a mensagem deve ser eliminada
-      incrementCount(eliminateCount, getClientKey(p));
-      logMessage(p, "Eliminada", false);
-      return;
-    }
-
-    if(randomize(config.getCutProbability())) { // Verifica se a mensagem deve ser cortada - Sempre é cortada se > 1024 bytes
-      this.cutMessage(p);
-    }
-    
-    if(randomize(config.getDelayProbability())) { // Verifica se a mensagem deve ser atrasada
-      this.delayMessage(p);
-    }
-    
-    if(randomize(config.getCorruptProbability())) { // Verifica se a mensagem deve ser corrompida
-      this.corruptMesage(p);
-    } else if(randomize(config.getDuplicateProbability())) { // Verifica se a mensagem deve ser duplicada
-      this.duplicateMessage(p);
-    }
-
-    super.send(p); // Envia a mensagem
   }
 
+  public void send(DatagramPacket p, int segmentSequenceNumber, boolean isAck) throws IOException { // Recebe pedidos de envio de segmentos UDP
+    this.incrementCount(sendCount, getClientKey(p));
+    this.buildSegment(p, isAck, segmentSequenceNumber);
+    this.applyErrorsAndSend(p);
+  }
 
   public String receive(int length) throws IOException { // Recebe a mensagem
     DatagramPacket p = new DatagramPacket(new byte[length], length);
@@ -252,6 +221,67 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     }
 
     return messageString;
+  }
+
+  private void sendACK(DatagramPacket p, int seqNumber) throws IOException {  // Envia o ACK
+    DatagramPacket ack = new DatagramPacket("ACK".getBytes(), 3);
+    ack.setAddress(p.getAddress());
+    ack.setPort(p.getPort());
+    this.send(ack, seqNumber, true);
+  }
+
+  public void receiveACK() throws IOException {
+    this.receive(1024);
+  }
+
+  private void buildSegment(DatagramPacket p, boolean isAck, int segmentSequenceNumber) {
+    byte[] messageBytes = p.getData();
+    int definedSequenceNumber;
+    if(segmentSequenceNumber != -1) { // Se o número de sequência for diferente de -1, utiliza o número de sequência fornecido (para ACKs e retransmissões)
+      definedSequenceNumber = segmentSequenceNumber;
+    } else { // Caso contrário, pega o próximo número de sequência
+      definedSequenceNumber = getSequenceNumber();
+    }
+
+    byte[] seqNumber = java.nio.ByteBuffer.allocate(4).putInt(definedSequenceNumber).array();
+
+    int sum = calculateChecksum(messageBytes, seqNumber);
+
+    byte[] checksum = java.nio.ByteBuffer.allocate(4).putInt(sum).array();
+    byte[] isAckBytes = java.nio.ByteBuffer.allocate(1).putInt(isAck ? 1 : 0).array();
+
+    byte[] data = new byte[checksum.length + seqNumber.length + isAckBytes.length + messageBytes.length];
+    System.arraycopy(checksum, 0, data, 0, checksum.length);  // Primeiros 4 bytes da mensagem representam o checksum
+    System.arraycopy(seqNumber, 0, data, checksum.length, seqNumber.length); // 4 Bytes seguintes representam o número de sequência
+    System.arraycopy(isAckBytes, 0, data, checksum.length + seqNumber.length, isAckBytes.length); // byte seguinte indica se é ack
+    System.arraycopy(messageBytes, 0, data, checksum.length + seqNumber.length + isAckBytes.length, messageBytes.length); // Restante da mensagem é o conteúdo de fato
+
+    p.setData(data);
+    p.setLength(data.length);
+  }
+
+  private void applyErrorsAndSend(DatagramPacket p) throws IOException {
+    if(randomize(config.getEliminateProbability())) { // Verifica se a mensagem deve ser eliminada
+      incrementCount(eliminateCount, getClientKey(p));
+      logMessage(p, "Eliminada", false);
+      return;
+    }
+
+    if(randomize(config.getCutProbability())) { // Verifica se a mensagem deve ser cortada - Sempre é cortada se > 1024 bytes
+      this.cutMessage(p);
+    }
+    
+    if(randomize(config.getDelayProbability())) { // Verifica se a mensagem deve ser atrasada
+      this.delayMessage(p);
+    }
+    
+    if(randomize(config.getCorruptProbability())) { // Verifica se a mensagem deve ser corrompida
+      this.corruptMesage(p);
+    } else if(randomize(config.getDuplicateProbability())) { // Verifica se a mensagem deve ser duplicada
+      this.duplicateMessage(p);
+    }
+
+    super.send(p); // Envia a mensagem
   }
 
   private void delayMessage(DatagramPacket p) { // Método para atrasar a mensagem
@@ -387,20 +417,9 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     return sum;
   }
 
-  private void sendACK(DatagramPacket p, int seqNumber) throws IOException {  // Envia o ACK
-    DatagramPacket ack = new DatagramPacket("ACK".getBytes(), 3);
-    ack.setAddress(p.getAddress());
-    ack.setPort(p.getPort());
-    this.send(ack, seqNumber, true);
-  }
-
   private String getMessage(DatagramPacket p) {
     byte[] data = p.getData();
 
     return new String(Arrays.copyOfRange(data, 8, data.length), StandardCharsets.UTF_8);
-  }
-
-  public void receiveACK() throws IOException {
-    this.receive(1024);
   }
 }

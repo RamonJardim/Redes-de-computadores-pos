@@ -54,19 +54,18 @@ public class Sender {
         }
       }
     
-      DatagramPacket[] messages = new DatagramPacket[messagesString.size()];
-      for (int i = 0; i < messages.length; i++) {
-        messages[i] = new DatagramPacket(message.getBytes(), message.length());
-        messages[i].setAddress(ipAddress);
-        messages[i].setPort(receiverPort);
+      List<DatagramPacket> messages = new ArrayList<DatagramPacket>();
+      for (int i = 0; i < messages.size(); i++) {
+        DatagramPacket p = new DatagramPacket(message.getBytes(), message.length());
+        p.setAddress(ipAddress);
+        p.setPort(receiverPort);
+        messages.add(p);
       }
 
       ACKListener ackListener = new ACKListener(channel);
       ackListener.start();
 
-      for (int i = 0; i < messages.length; i++) { // Envia as mensagens em sequência
-        channel.send(messages[i]);
-      }
+      channel.send(messages); // Envia as mensagens pelo canal confiável utilizando go back n
 
       ackListener.join();
 
