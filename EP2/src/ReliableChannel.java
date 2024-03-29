@@ -275,10 +275,10 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     byte[] data = p.getData();
     byte[] checksum = Arrays.copyOfRange(data, 0, 4);
     byte[] seqNumber = Arrays.copyOfRange(data, 4, 8);
-    byte[] isAckArray = Arrays.copyOfRange(data, 8, 9);
+    byte[] isAckArray = Arrays.copyOfRange(data, 8, 12);
     int seqNumberInt = ByteBuffer.wrap(seqNumber).getInt();
     boolean isAck = ByteBuffer.wrap(isAckArray).getInt() == 1;
-    byte[] message = Arrays.copyOfRange(data, 9, p.getLength());
+    byte[] message = Arrays.copyOfRange(data, 12, p.getLength());
     String messageString = new String(message, StandardCharsets.UTF_8);
 
     int sum = calculateChecksum(message, seqNumber);
