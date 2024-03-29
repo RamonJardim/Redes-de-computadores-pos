@@ -1,9 +1,6 @@
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -13,7 +10,6 @@ public class Sender {
   private static final int DEFAULT_RECEIVER_PORT = 4321;
 
   private static Scanner sc = new Scanner(System.in);
-  private static Scanner scInt = new Scanner(System.in);
 
   public static void main(String[] args) { // Faz as leituras de ip e portas e envia os pacotes
     System.out.printf("Digite a porta do sender (%d): ", DEFAULT_SENDER_PORT);
@@ -38,36 +34,23 @@ public class Sender {
     String receiverPortString = sc.nextLine();
     int receiverPort = receiverPortString.equals("") ? DEFAULT_RECEIVER_PORT : Integer.parseInt(receiverPortString);
 
-    System.out.println("Digite a mensagem que deseja enviar (vazio para ler as linhas de um arquivo):");
+    System.out.println("Digite a mensagem que deseja enviar:");
     String message = sc.nextLine();
 
     try (ReliableChannel channel = new ReliableChannel(clientPort)) {
-      List<String> messagesString = new ArrayList<>();
-      if(message.equals("")) {
-        System.out.print("Digite o caminho do arquivo: ");
-        messagesString = Files.readAllLines(Path.of(sc.nextLine()));
-      } else {
-        System.out.println("Digite quantas vezes deseja enviar (1000):");
-        int messageCount = scInt.nextInt();
-        for (int i = 0; i < messageCount; i++) {
-          messagesString.add(message);
-        }
-      }
-    
+      System.out.println("Digite quantas vezes deseja enviar (1000):");
+      String receiverCountString = sc.nextLine();
+      int messageCount = receiverCountString.equals("") ? 1000 : Integer.parseInt(receiverCountString);
+
       List<DatagramPacket> messages = new ArrayList<DatagramPacket>();
-      for (int i = 0; i < messages.size(); i++) {
+      for (int i = 0; i < messageCount; i++) {
         DatagramPacket p = new DatagramPacket(message.getBytes(), message.length());
         p.setAddress(ipAddress);
         p.setPort(receiverPort);
         messages.add(p);
       }
 
-      ACKListener ackListener = new ACKListener(channel);
-      ackListener.start();
-
       channel.send(messages); // Envia as mensagens pelo canal confiável utilizando go back n
-
-      ackListener.join();
 
       channel.consolidateAll();  // Exibe consolidação das mensagens
     } catch (Exception e) {
