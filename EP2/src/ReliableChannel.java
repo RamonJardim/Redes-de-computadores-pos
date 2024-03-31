@@ -1,10 +1,3 @@
-// Talvez usar loops para simular uma estrutura de eventos
-// Timeouts subtrações de system.time
-
-// Thread esperando pacotes e atualizando maps e envia ack como um async
-// Thread enviando pacotes e atualizando maps
-
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -23,84 +16,84 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.gson.Gson;
 
-class Config { // Classe para representar arquivo de configuração
-  private int eliminateProbability;
-  private int delayProbability;
-  private int delayMS;
-  private int duplicateProbability;
-  private int corruptBytes;
-  private int corruptProbability;
-  private int cutProbability;
-  private int cutBytes;
-  private int windowSize;
-  private int timeout;
+public class ReliableChannel extends DatagramSocket { // Canal de comunicação
 
-  public int getEliminateProbability() {
-    return eliminateProbability;
-  }
-  public int getDelayProbability() {
-    return delayProbability;
-  }
-  public int getDelayMS() {
-    return delayMS;
-  }
-  public int getDuplicateProbability() {
-    return duplicateProbability;
-  }
-  public int getCorruptBytes() {
-    return corruptBytes;
-  }
-  public int getCorruptProbability() {
-    return corruptProbability;
-  }
-  public int getCutProbability() {
-    return cutProbability;
-  }
-  public int getCutBytes() {
-    return cutBytes;
-  }
-  public int getWindowSize() {
-    return windowSize;
-  }
-  public void setWindowSize(int windowSize) {
-    this.windowSize = windowSize;
-  }
-  public int getTimeout() {
-    return timeout;
-  }
-}
-
-class ACKListener extends Thread { // Recebe os ACKs em paralelo
-  private ReliableChannel channel;
-
-  public ACKListener(ReliableChannel channel) {
-    this.channel = channel;
-  }
-
-  @Override
-  public void run() {
-    try {
-      receiveACK();
-    } catch (IOException e) {
-      System.out.println("Erro ao receber ACK");
-      e.printStackTrace();
+  private class Config { // Classe para representar arquivo de configuração
+    private int eliminateProbability;
+    private int delayProbability;
+    private int delayMS;
+    private int duplicateProbability;
+    private int corruptBytes;
+    private int corruptProbability;
+    private int cutProbability;
+    private int cutBytes;
+    private int windowSize;
+    private int timeout;
+  
+    public int getEliminateProbability() {
+      return eliminateProbability;
+    }
+    public int getDelayProbability() {
+      return delayProbability;
+    }
+    public int getDelayMS() {
+      return delayMS;
+    }
+    public int getDuplicateProbability() {
+      return duplicateProbability;
+    }
+    public int getCorruptBytes() {
+      return corruptBytes;
+    }
+    public int getCorruptProbability() {
+      return corruptProbability;
+    }
+    public int getCutProbability() {
+      return cutProbability;
+    }
+    public int getCutBytes() {
+      return cutBytes;
+    }
+    public int getWindowSize() {
+      return windowSize;
+    }
+    public void setWindowSize(int windowSize) {
+      this.windowSize = windowSize;
+    }
+    public int getTimeout() {
+      return timeout;
     }
   }
 
-  private void receiveACK() throws IOException {
-    while (true) {
+  private class ACKListener extends Thread { // Recebe os ACKs em paralelo
+    private ReliableChannel channel;
+  
+    public ACKListener(ReliableChannel channel) {
+      this.channel = channel;
+    }
+  
+    @Override
+    public void run() {
       try {
-        channel.receiveACK();
-      } catch (Exception e) {
-        break;
+        receiveACK();
+      } catch (IOException e) {
+        System.out.println("Erro ao receber ACK");
+        e.printStackTrace();
+      }
+    }
+  
+    private void receiveACK() throws IOException {
+      while (this.channel.base <= this.channel.sendingDataPackets.size()) {
+        try {
+          channel.receiveACK();
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
       }
     }
   }
-}
 
-public class ReliableChannel extends DatagramSocket { // Canal de comunicação
-
-  class Timer extends Thread { // Timer para reenviar pacotes
+  private class Timer extends Thread { // Timer para reenviar pacotes
     private int packetNumber;
     private ReliableChannel channel;
     private Config config;
@@ -119,16 +112,15 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     public void run() {
       try {
         Thread.sleep(config.getTimeout());
-        this.channel.timeout();
+        this.channel.timeout(this.packetNumber);
         this.channel.timer = null;
       } catch (InterruptedException e) {
-        System.out.println("Erro no timer");
-        e.printStackTrace();
+        System.out.println(greenText("Timer para ACK " + this.getPacketNumber() + " parado"));
       }
     }
   }
 
-  class ACKSender extends Thread { // Envia os ACKs em paralelo
+  private class ACKSender extends Thread { // Envia os ACKs em paralelo
     private ReliableChannel channel;
     private int seqNumber;
     private DatagramPacket p;
@@ -159,15 +151,16 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     }
   }
 
+  private final boolean REMOVE_COLORS = false;
 
   private Config config;
   private Random random = new Random();
   private Timer timer;
   private int sequenceNumber = 1;
-  private boolean timeout = false;
+  private int timeout = -1;
 
   private List<DatagramPacket> sendingDataPackets = Collections.synchronizedList(new ArrayList<>()); // Buffer do remetente
-  private int nextseqnum = 1;
+  private int nextSeqNum = 1;
   private int base = 1;
 
   private int expectedSeqNum = 1;
@@ -197,6 +190,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
       System.exit(1);
     }
 
+    this.setSoTimeout(this.config.getTimeout() + 1000);
   }
 
   private synchronized int getSequenceNumber() { // Retorna o sequence number da próxima mensagem a ser enviada
@@ -213,52 +207,58 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     ACKListener ackListener = new ACKListener(this);
     ackListener.start();
 
+    startTimer(1);
     sendWindow(false); // Envia primeira janela de pacotes
-    while(base != sendingDataPackets.size()) { // Enquanto não confirmou todos os pacotes
-      if(this.timeout) {
-        System.out.println("Timeout, reenviando pacotes");
-        startTimer();
-        this.timeout = false;
+    while(base <= sendingDataPackets.size()) { // Enquanto não confirmou todos os pacotes
+      if(this.timeout != -1) {
+        System.out.println(redText("Timeout") + " - Pacote [" + timeout + "]");
+        startTimer(base);
         sendWindow(true);
+        this.timeout = -1;
+      } else {
+        sendRange(); // Envia pacotes dentro do avanço da janela
       }
     }
 
-    ackListener.interrupt(); // Para de ouvir os ACKs
-  }
+    try {
+      ackListener.interrupt(); // Para de ouvir os ACKs
+    } catch (Exception e) {
 
-  private void sendWindow(boolean isRetransmission) throws IOException {
-    for(int i = base - 1 ; i < base + config.getWindowSize() && i < sendingDataPackets.size() ; i++) {
-      DatagramPacket p = sendingDataPackets.get(i);
-      System.out.println("[Window] Enviando pacote " + (i+1));
-      send(new DatagramPacket(p.getData().clone(), p.getLength(), p.getAddress(), p.getPort()), i, false);
-      if(base == nextseqnum) {
-        startTimer();
-      }
-      if(!isRetransmission) nextseqnum = i + 1;
     }
   }
 
-  private void sendRange() throws IOException {
-    for(int i = nextseqnum ; i < base + config.getWindowSize() && i < sendingDataPackets.size() ; i++) {
+  private void sendWindow(boolean isRetransmission) throws IOException { // Envia janela inicial de pacotes (ou retransmissão)
+    int currentBase = base;
+    for(int i = currentBase - 1 ; i < currentBase - 1 + config.getWindowSize() && i < sendingDataPackets.size() ; i++) {
       DatagramPacket p = sendingDataPackets.get(i);
-      System.out.println("[Range] Enviando pacote " + i);
       send(new DatagramPacket(p.getData().clone(), p.getLength(), p.getAddress(), p.getPort()), i, false);
-      nextseqnum = i + 1;
+      if(!isRetransmission) nextSeqNum++;
     }
   }
 
-  private void startTimer() {
-    this.timer = new Timer(nextseqnum, config, this);
+  private void sendRange() throws IOException { // Envia pacotes dentro do avanço da janela
+    int currentBase = base;
+    for(int i = nextSeqNum ; i < currentBase + 1 + config.getWindowSize() && i < sendingDataPackets.size() + 1 ; i++) {
+      DatagramPacket p = sendingDataPackets.get(i - 1);
+      send(new DatagramPacket(p.getData().clone(), p.getLength(), p.getAddress(), p.getPort()), i - 1, false);
+      nextSeqNum++;
+    }
+  }
+
+  private void startTimer(int seqNum) { // Inicia timer
+    System.out.println(yellowText("Iniciando timer para pacote " + (seqNum)));
+    this.timer = new Timer(seqNum, config, this);
     timer.start();
   }
 
-  private void stopTimer() {
+  private void stopTimer() { // Para o timer
+    if(timer == null) return;
     timer.interrupt();
     this.timer = null;
   }
 
-  private void timeout() {
-    this.timeout = true;
+  private void timeout(int packetNumber) { // Seta flag de timeout
+    this.timeout = packetNumber;
   }
 
   public void send(DatagramPacket p, int segmentSequenceNumber, boolean isAck) throws IOException { // Recebe pedidos de envio de segmentos UDP
@@ -280,7 +280,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     byte[] message = Arrays.copyOfRange(data, 12, p.getLength());
     String messageString = new String(message, StandardCharsets.UTF_8);
 
-    int sum = calculateChecksum(message, seqNumber);
+    int sum = calculateChecksum(message, seqNumber, isAckArray);
     if(sum != ByteBuffer.wrap(checksum).getInt()) { // Verifica se o checksum está correto
       logMessage(p, redText("Corrompida/cortada"), true);
       incrementCount(receivedWithFailedIntegrityCount, getClientKey(p));
@@ -307,7 +307,9 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
           logMessage(p, redText("Fora de ordem"), true);
         }
       } else {
-        this.base = seqNumberInt > this.base ? seqNumberInt : this.base;
+        boolean alreadyConfirmed = !(seqNumberInt >= this.base);
+        logMessage(p, alreadyConfirmed ? "Já confirmado" : "Confirmado", true);
+        this.base = !alreadyConfirmed ? seqNumberInt + 1 : this.base; // Se o ack for de um pacote ainda não confirmado, avança base para o próximo pacote
       }
     }
 
@@ -321,21 +323,22 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     this.send(ack, seqNumber, true);
   }
 
-  public void receiveACK() throws IOException {
+  public void receiveACK() throws IOException { // Recebe os ACKs
     this.receive(1024);
-    if(base == nextseqnum) {
+    if((this.timer != null && this.timer.getPacketNumber() < base) || base == sendingDataPackets.size()) {
       stopTimer(); // Para o timer se recebeu todos os ACKs da janela de envio
     } else {
-      sendRange(); // Envia pacotes dentro do avanço da janela
-      if(this.timer == null) {
-        startTimer();
-      } else {
-        System.out.println("Timer já está rodando para pacote " + timer.getPacketNumber());
-      }
+      validateAndStartTimer();
     }
   }
 
-  private void buildSegment(DatagramPacket p, boolean isAck, int segmentSequenceNumber) {
+  private synchronized void validateAndStartTimer() {
+    if(this.timer == null && base < sendingDataPackets.size()) { // Se não recebeu todos os ACKs, mas o timer não está rodando, reinicia o timer
+      startTimer(base);
+    }
+  }
+
+  private void buildSegment(DatagramPacket p, boolean isAck, int segmentSequenceNumber) { // Constrói o segmento UDP com o header definido
     byte[] messageBytes = p.getData();
     int definedSequenceNumber;
     if(segmentSequenceNumber != -1) { // Se o número de sequência for diferente de -1, utiliza o número de sequência fornecido (para ACKs e retransmissões)
@@ -345,23 +348,23 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     }
 
     byte[] seqNumber = java.nio.ByteBuffer.allocate(4).putInt(definedSequenceNumber).array();
+    byte[] isAckBytes = java.nio.ByteBuffer.allocate(4).putInt(isAck ? 1 : 0).array();
 
-    int sum = calculateChecksum(messageBytes, seqNumber);
+    int sum = calculateChecksum(messageBytes, seqNumber, isAckBytes);
 
     byte[] checksum = java.nio.ByteBuffer.allocate(4).putInt(sum).array();
-    byte[] isAckBytes = java.nio.ByteBuffer.allocate(4).putInt(isAck ? 1 : 0).array();
 
     byte[] data = new byte[checksum.length + seqNumber.length + isAckBytes.length + messageBytes.length];
     System.arraycopy(checksum, 0, data, 0, checksum.length);  // Primeiros 4 bytes da mensagem representam o checksum
     System.arraycopy(seqNumber, 0, data, checksum.length, seqNumber.length); // 4 Bytes seguintes representam o número de sequência
-    System.arraycopy(isAckBytes, 0, data, checksum.length + seqNumber.length, isAckBytes.length); // byte seguinte indica se é ack
+    System.arraycopy(isAckBytes, 0, data, checksum.length + seqNumber.length, isAckBytes.length); // 4 bytes seguinte indica se é ack
     System.arraycopy(messageBytes, 0, data, checksum.length + seqNumber.length + isAckBytes.length, messageBytes.length); // Restante da mensagem é o conteúdo de fato
 
     p.setData(data);
     p.setLength(data.length);
   }
 
-  private void applyErrorsAndSend(DatagramPacket p) throws IOException {
+  private void applyErrorsAndSend(DatagramPacket p) throws IOException { // Aplica falhas e envia a mensagem
     boolean eliminated = randomize(config.getEliminateProbability());
     boolean cut = randomize(config.getCutProbability());
     boolean delayed = randomize(config.getDelayProbability());
@@ -541,18 +544,18 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
   }
 
   private String redText(String text) {
-    return "\u001B[31m" + text + "\u001B[0m";
+    return REMOVE_COLORS ? text : "\u001B[31m" + text + "\u001B[0m";
   }
 
   private String blueText(String text) {
-    return "\u001B[34m" + text + "\u001B[0m";
+    return REMOVE_COLORS ? text : "\u001B[34m" + text + "\u001B[0m";
   }
 
   private String greenText(String text) {
-    return "\u001B[32m" + text + "\u001B[0m";
+    return REMOVE_COLORS ? text : "\u001B[32m" + text + "\u001B[0m";
   }
 
   private String yellowText(String text) {
-    return "\u001B[33m" + text + "\u001B[0m";
+    return REMOVE_COLORS ? text : "\u001B[33m" + text + "\u001B[0m";
   }
 }

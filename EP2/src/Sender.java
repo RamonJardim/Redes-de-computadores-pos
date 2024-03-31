@@ -34,8 +34,9 @@ public class Sender {
     String receiverPortString = sc.nextLine();
     int receiverPort = receiverPortString.equals("") ? DEFAULT_RECEIVER_PORT : Integer.parseInt(receiverPortString);
 
-    System.out.println("Digite a mensagem que deseja enviar:");
+    System.out.println("Digite a mensagem que deseja enviar (oi):");
     String message = sc.nextLine();
+    message = message.equals("") ? "oi" : message;
 
     try (ReliableChannel channel = new ReliableChannel(clientPort)) {
       System.out.println("Digite quantas vezes deseja enviar (1000):");
