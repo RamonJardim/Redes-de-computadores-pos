@@ -7,5 +7,6 @@
   "corruptProbability": 2,
   "cutProbability": 100,
   "cutBytes": 1024,
-  "windowSize": 10
+  "windowSize": 10,
+  "timeout": 500
 }
