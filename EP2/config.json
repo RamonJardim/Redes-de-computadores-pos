@@ -1,11 +1,12 @@
 {
-  "eliminateProbability": 4,
-  "delayProbability": 5,
+  "eliminateProbability": 0,
+  "delayProbability": 0,
   "delayMS": 80,
-  "duplicateProbability": 3,
+  "duplicateProbability": 0,
   "corruptBytes": 1,
-  "corruptProbability": 2,
+  "corruptProbability": 0,
   "cutProbability": 100,
   "cutBytes": 1024,
-  "windowSize": 10
+  "windowSize": 10,
+  "timeout": 500
 }
