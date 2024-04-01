@@ -23,7 +23,6 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     private int delayProbability;
     private int delayMS;
     private int duplicateProbability;
-    private int corruptBytes;
     private int corruptProbability;
     private int cutProbability;
     private int cutBytes;
@@ -42,9 +41,6 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     public int getDuplicateProbability() {
       return duplicateProbability;
     }
-    public int getCorruptBytes() {
-      return corruptBytes;
-    }
     public int getCorruptProbability() {
       return corruptProbability;
     }
@@ -56,9 +52,6 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     }
     public int getWindowSize() {
       return windowSize;
-    }
-    public void setWindowSize(int windowSize) {
-      this.windowSize = windowSize;
     }
     public int getTimeout() {
       return timeout;
@@ -190,7 +183,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
       System.exit(1);
     }
 
-    this.setSoTimeout(this.config.getTimeout() + 1000);
+    this.setSoTimeout(this.config.getTimeout() + 10000);
   }
 
   private synchronized int getSequenceNumber() { // Retorna o sequence number da próxima mensagem a ser enviada
@@ -246,6 +239,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
   }
 
   private void startTimer(int seqNum) { // Inicia timer
+    if(this.timer != null && this.timer.getPacketNumber() == seqNum) return; // Não reinicia o timer se pacote já está sendo monitorado
     System.out.println(yellowText("Iniciando timer para pacote " + (seqNum)));
     this.timer = new Timer(seqNum, config, this);
     timer.start();
@@ -304,9 +298,14 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
           logMessage(p, greenText("Entregue"), true);
         } else { // Se não for, adiciona o número de sequência ao mapa e não envia o ACK
           new ACKSender(this, expectedSeqNum - 1, p).start(); // Envia o ACK do próximo número de sequência esperado
-          logMessage(p, redText("Fora de ordem"), true);
+          String expectedSeqNums = "";
+          for(int i = expectedSeqNum ; i < seqNumberInt ; i++) { // Envia ACKs para os pacotes faltantes
+            expectedSeqNums += i + " ";
+          }
+          logMessage(p, redText("Fora de ordem") + " - aguardando " + expectedSeqNums, true);
         }
       } else {
+        seqNumList.add(seqNumberInt);
         boolean alreadyConfirmed = !(seqNumberInt >= this.base);
         logMessage(p, alreadyConfirmed ? "Já confirmado" : "Confirmado", true);
         this.base = !alreadyConfirmed ? seqNumberInt + 1 : this.base; // Se o ack for de um pacote ainda não confirmado, avança base para o próximo pacote
@@ -327,6 +326,9 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     this.receive(1024);
     if((this.timer != null && this.timer.getPacketNumber() < base) || base == sendingDataPackets.size()) {
       stopTimer(); // Para o timer se recebeu todos os ACKs da janela de envio
+      if(base <= sendingDataPackets.size()) {
+        startTimer(base); // Se não recebeu todos os ACKs, reinicia o timer
+      }
     } else {
       validateAndStartTimer();
     }
@@ -497,7 +499,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
   private void consolidateReceived(String key) { // Consolida as estatísticas de recebimento
     ArrayList<Integer> seqNumlist = seqNumberMap.getOrDefault(key, new ArrayList<>());
     System.out.printf("Total de mensagens recebidas: %d%n", receivedCount.getOrDefault(key, 0));
-    System.out.printf("Total de mensagens perdidas (Sequence Number não encontrado): %d%n", seqNumlist.size() == 0 ? 0 : countMissingMessages(seqNumlist) - receivedWithFailedIntegrityCount.getOrDefault(key, 0));
+    System.out.printf("Total de mensagens perdidas (Sequence Number não encontrado): %d%n", seqNumlist.size() == 0 ? 0 : countMissingMessages(seqNumlist));
     System.out.printf("Total de mensagens duplicadas: %d%n", receiveDuplicateCount.getOrDefault(key, 0));
     System.out.printf("Total de mensagens corrompidas/cortadas (checksum falhou): %d%n", receivedWithFailedIntegrityCount.getOrDefault(key, 0));
 
