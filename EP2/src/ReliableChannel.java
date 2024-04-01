@@ -289,6 +289,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
     if(seqNumList.contains(seqNumberInt)) { // Verifica se a mensagem é duplicada
       logMessage(p, redText("Duplicada"), true);
       incrementCount(receiveDuplicateCount, getClientKey(p));
+      if(!isAck) new ACKSender(this, expectedSeqNum - 1, p).start(); // Envia o ACK do próximo número de sequência esperado
     } else {
       if(!isAck) {
         if(expectedSeqNum == seqNumberInt) { // Verifica se o número de sequência é o esperado
@@ -324,7 +325,7 @@ public class ReliableChannel extends DatagramSocket { // Canal de comunicação
 
   public void receiveACK() throws IOException { // Recebe os ACKs
     this.receive(1024);
-    if((this.timer != null && this.timer.getPacketNumber() < base) || base == sendingDataPackets.size()) {
+    if((this.timer != null && this.timer.getPacketNumber() < base) || base > sendingDataPackets.size()) {
       stopTimer(); // Para o timer se recebeu todos os ACKs da janela de envio
       if(base <= sendingDataPackets.size()) {
         startTimer(base); // Se não recebeu todos os ACKs, reinicia o timer
