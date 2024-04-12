@@ -12,6 +12,7 @@ public class Sender {
   private static Scanner sc = new Scanner(System.in);
 
   public static void main(String[] args) { // Faz as leituras de ip e portas e envia os pacotes
+    long start = System.currentTimeMillis();
     System.out.printf("Digite a porta do sender (%d): ", DEFAULT_SENDER_PORT);
     String clientPortString = sc.nextLine();
     int clientPort = clientPortString.equals("") ? DEFAULT_SENDER_PORT : Integer.parseInt(clientPortString);
@@ -54,6 +55,9 @@ public class Sender {
       channel.send(messages); // Envia as mensagens pelo canal confiável utilizando go back n
 
       channel.consolidateAll();  // Exibe consolidação das mensagens
+      long finish = System.currentTimeMillis();
+      long timeElapsed = finish - start;
+      System.out.println("Tempo total de execução: " + timeElapsed + "ms");
     } catch (Exception e) {
       System.out.println("Erro no envio dos pacotes para o receiver");
       e.printStackTrace();

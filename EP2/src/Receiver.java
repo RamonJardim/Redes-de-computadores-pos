@@ -7,6 +7,7 @@ public class Receiver {
   private static final int DEFAULT_RECEIVER_TIMEOUT = 10000;
 
   public static void main(String[] args) throws Exception { // Lê a porta e recebe pacotes
+    long start = System.currentTimeMillis();
     System.out.printf("Digite a porta do receiver (%d): ", DEFAULT_RECEIVER_PORT);
     String receiverPortString = sc.nextLine();
     int receiverPort = receiverPortString.equals("") ? DEFAULT_RECEIVER_PORT : Integer.parseInt(receiverPortString);
@@ -22,6 +23,9 @@ public class Receiver {
         }
       }
       channel.consolidateAll(); // Exibe consolidação das mensagens
+      long finish = System.currentTimeMillis();
+      long timeElapsed = finish - start;
+      System.out.println("Tempo total de execução: " + timeElapsed + "ms");
     } catch (Exception e) {
       System.out.println("Erro no recebimento de pacotes no receiver");
       e.printStackTrace();
