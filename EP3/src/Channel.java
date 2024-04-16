@@ -1,6 +1,12 @@
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.Arrays;
 import java.util.Map;
@@ -9,8 +15,35 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class DatagramInfo extends DatagramSocket { // Canal de comunicação
+class DatagramInfo implements Serializable {
+  private int id; // Identificador do roteador
+  private int[] vector; // Vetor de distâncias (indíce indica o id do roteador e o valor a distância até ele)
+
+  public DatagramInfo(int id, int[] vector) {
+    this.id = id;
+    this.vector = vector;
+  }
+
+  public int getId() {
+    return id;
+  }
+
+  public void setId(int id) {
+    this.id = id;
+  }
+
+  public int[] getVector() {
+    return vector;
+  }
+
+  public void setVector(int[] vector) {
+    this.vector = vector;
+  }
+}
+
+public class Channel extends DatagramSocket { // Canal de comunicação
   private final boolean REMOVE_COLORS = false;
+  private final boolean LOG_ENABLED = false;
   private final int eliminateProbability = 4;
 
   private Random random = new Random();
@@ -20,7 +53,7 @@ public class DatagramInfo extends DatagramSocket { // Canal de comunicação
 
   private ConcurrentHashMap<String, Integer> receivedCount = new ConcurrentHashMap<>();
 
-  public DatagramInfo(int port) throws SocketException {
+  public Channel(int port) throws SocketException {
     super(port);
   }
 
@@ -29,18 +62,33 @@ public class DatagramInfo extends DatagramSocket { // Canal de comunicação
     this.applyErrorsAndSend(p);
   }
 
-  public String receive(int length) throws IOException { // Recebe a mensagem
-    DatagramPacket p = new DatagramPacket(new byte[length], length);
+  public void send(DatagramInfo info, int destinationId) throws IOException { // Recebe pedidos de envio de segmentos UDP
+    byte[] data = null;
+
+    try (ByteArrayOutputStream bos = new ByteArrayOutputStream(); 
+      ObjectOutputStream oos = new ObjectOutputStream(bos)) {
+      oos.writeObject(info);
+      data = bos.toByteArray();
+    }
+
+    DatagramPacket p = new DatagramPacket(data, data.length, InetAddress.getLocalHost(), destinationId + 10000);
+    this.send(p);
+  }
+
+  public DatagramInfo receive() throws IOException { // Recebe a mensagem
+    DatagramPacket p = new DatagramPacket(new byte[1024], 1024);
     super.receive(p);
     incrementCount(receivedCount, getClientKey(p));
     byte[] data = p.getData();
+    DatagramInfo datagramInfo = null;
+    try (ByteArrayInputStream bis = new ByteArrayInputStream(data);
+      ObjectInputStream ois = new ObjectInputStream(bis)) {
+      datagramInfo = (DatagramInfo) ois.readObject();
+    } catch (ClassNotFoundException e) {
+      e.printStackTrace();
+    }
 
-    return messageString;
-
-    /* Passar a enviar uma classe (DatagramInfo) com myId e vetor:
-     * DatagramInfo vira Channel
-     * DatagramInfo vira classe interna de Channel
-    */
+    return datagramInfo;
   }
 
   private void applyErrorsAndSend(DatagramPacket p) throws IOException { // Aplica falhas e envia a mensagem
@@ -72,7 +120,9 @@ public class DatagramInfo extends DatagramSocket { // Canal de comunicação
   }
 
   private void logMessage(DatagramPacket p, String status, boolean received) {
-    System.out.printf("%s: %s%n", received ? greenText("Recebida") : blueText("Enviada"), status);
+    if(LOG_ENABLED) {
+      System.out.printf("%s: %s%n", received ? greenText("Recebida") : blueText("Enviada"), status);
+    }
   }
 
   public void consolidateAll() { // Consolida todas as estatísticas

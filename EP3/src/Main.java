@@ -21,7 +21,7 @@ public class Main {
       String[] nodes = adjacencyTable.split("\r\n");
       Router[] routers = new Router[nodes.length];
       for (int i = 0 ; i < nodes.length ; i++) {
-        routers[i] = new Router(Integer.parseInt(nodes[i].charAt(0)+""), convertToDistanceVector(nodes[i]));
+        routers[i] = new Router(Integer.parseInt(nodes[i].split(" ")[0]), convertToDistanceVector(nodes[i]));
         routers[i].start();
       }
 
