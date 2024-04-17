@@ -8,11 +8,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Random;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 
 class DatagramInfo implements Serializable {
@@ -44,7 +41,7 @@ class DatagramInfo implements Serializable {
 public class Channel extends DatagramSocket { // Canal de comunicação
   private final boolean REMOVE_COLORS = false;
   private final boolean LOG_ENABLED = false;
-  private final int eliminateProbability = 4;
+  private final int eliminateProbability = 0;
 
   private Random random = new Random();
 
@@ -154,6 +151,10 @@ public class Channel extends DatagramSocket { // Canal de comunicação
 
     sendCount.put(key, 0);
     eliminateCount.put(key, 0);
+  }
+
+  public int getSentCount() {
+    return sendCount.values().stream().mapToInt(Integer::intValue).sum();
   }
 
   private String redText(String text) {
