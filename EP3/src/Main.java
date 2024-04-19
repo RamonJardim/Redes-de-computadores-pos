@@ -12,7 +12,12 @@ public class Main {
     boolean generate = sc.nextLine().equals("1");
     String[] adjacencyTable;
     if(generate) {
-      adjacencyTable = generateAdjacencyTable();
+      System.out.println("Digite o número de nós: ");
+      int n = Integer.parseInt(sc.nextLine());
+  
+      System.out.println("Digite a porcentagem aproximada de conexões: ");
+      int percentage = Integer.parseInt(sc.nextLine());
+      adjacencyTable = generateAdjacencyTable(n, percentage);
     } else {
       System.out.println("Digite o nome do arquivo (adjacency_table.txt): ");
       String fileName = sc.nextLine();
@@ -25,16 +30,34 @@ public class Main {
   }
 
   private static void run(String[] nodes) throws InterruptedException {
+    System.out.println("Deseja alterar um link (1) ou derrubar um roteador (2)? (0 - não): ");
+    String opt = sc.nextLine();
+    int option = Integer.parseInt(opt == "" ? "0" : opt);
+
+    int routerToDrop = -1;
+    String linkToChange = "";
+    int newWeight = -1;
+    if(option == 1) {
+      System.out.println("Digite o id dos dois roteadores [No formato 'x y']: ");
+      linkToChange = sc.nextLine();
+      System.out.println("Digite o novo peso da conexão: ");
+      newWeight = Integer.parseInt(sc.nextLine());
+    } else if(option == 2) {
+      System.out.println("Digite o id do roteador a ser derrubado: ");
+      routerToDrop = Integer.parseInt(sc.nextLine());
+    }
+
     int routerPadding = ("" + nodes.length).length();
     int edgePadding = 0;
     for (int i = 0 ; i < nodes.length ; i++) {
       int[] initialDV = convertToDistanceVector(nodes[i]);
       edgePadding = Math.max((Arrays.stream(initialDV).max().getAsInt() + "").length(), edgePadding);
     }
+    edgePadding= Math.max(edgePadding, ("" + newWeight).length());
 
     Router[] routers = new Router[nodes.length];
     for (int i = 0 ; i < nodes.length ; i++) {
-      routers[i] = new Router(Integer.parseInt(nodes[i].split(" ")[0]), convertToDistanceVector(nodes[i]), routerPadding, edgePadding);
+      routers[i] = new Router(Integer.parseInt(nodes[i].split(" ")[0]), convertToDistanceVector(nodes[i]), linkToChange, newWeight, routerToDrop, routerPadding, edgePadding);
       routers[i].start();
     }
 
@@ -73,20 +96,14 @@ public class Main {
     return distanceVector;
   }
 
-  private static String[] generateAdjacencyTable() {
-    System.out.println("Digite o número de nós: ");
-    int n = Integer.parseInt(sc.nextLine());
-
-    System.out.println("Digite a porcentagem aproximada de conexões: ");
-    int percentage = Integer.parseInt(sc.nextLine());
-
+  private static String[] generateAdjacencyTable(int n, int percentage) {
     int[][] adjacencyTable = new int[n][n];
     for (int i = 0; i < n; i++) {
       for (int j = i; j < n; j++) {
         if (i == j) {
           adjacencyTable[i][j] = 0;
         } else {
-          int value = ((int) (Math.random() * 100) + 1) * (Math.random() < percentage / 100.0 ? 1 : 0);
+          int value = ((int) (Math.random() * 100) + 1) * (Math.random() < (percentage / 100.0) ? 1 : 0);
           adjacencyTable[i][j] = value;
           adjacencyTable[j][i] = value;
         }
