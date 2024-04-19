@@ -9,7 +9,7 @@ import java.util.Arrays;
 public class Router extends Thread {
   private final boolean REMOVE_COLORS = false;
   private final int DELAY = 0;
-  private final int TIMEOUT = 2000;
+  private final int TIMEOUT = 100;
   
   private int[] distanceVector;
   private int[] routingTable;
@@ -156,7 +156,7 @@ public class Router extends Thread {
   }
 
   private void log(String message, boolean force) {
-    if(myId == 1 || force) {
+    if((myId == 1 || force) && false) {
       System.out.println("[" + String.format("%" + routerPadding + "d", myId) + "]: " + message);
     }
   }
