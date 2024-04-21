@@ -218,7 +218,7 @@ public class Router extends Thread { // Classe que representa um roteador
     @Override
     public void run() {
       try {
-        Thread.sleep(TIMEOUT/3);
+        Thread.sleep(TIMEOUT/2);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
