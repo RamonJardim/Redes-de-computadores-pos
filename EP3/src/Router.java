@@ -5,8 +5,8 @@ import java.util.Arrays;
 
 public class Router extends Thread { // Classe que representa um roteador
   private final boolean REMOVE_COLORS = false;
-  private final int DELAY = 0;
-  private final int TIMEOUT = 2000;
+  private final int DELAY = 0; // Tempo que o roteador aguarda entre envios de pacotes
+  private final int TIMEOUT = 2000; // Tempo máximo de espera por um pacote (finaliza execução após este tempo sem receber pacotes)
   
   private int[] distanceVector; // Vetor de distâncias
   private int[] routingTable; // Tabela de roteamento
@@ -53,7 +53,7 @@ public class Router extends Thread { // Classe que representa um roteador
       this.routerPadding = routerPadding;
       this.edgePadding = edgePadding;
       this.neighbors = getNeighbors(); // Obtém vizinhos usando lista inicial de vizinhos
-      this.channel = new Channel(this.myId + 10000);
+      this.channel = new Channel(this.myId + 50000);
       this.channel.setSoTimeout(TIMEOUT);
       this.sender = new Sender();
       this.receiver = new Receiver();
