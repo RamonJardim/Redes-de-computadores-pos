@@ -53,7 +53,7 @@ public class Main {
       int[] initialDV = convertToDistanceVector(nodes[i]);
       edgePadding = Math.max((Arrays.stream(initialDV).max().getAsInt() + "").length(), edgePadding);
     }
-    edgePadding= Math.max(edgePadding, ("" + newWeight).length());
+    edgePadding = Math.max(edgePadding, ("" + newWeight).length());
 
     Router[] routers = new Router[nodes.length];
     for (int i = 0 ; i < nodes.length ; i++) {

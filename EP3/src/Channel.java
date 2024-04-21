@@ -68,7 +68,7 @@ public class Channel extends DatagramSocket { // Canal de comunicação
       data = bos.toByteArray();
     }
 
-    DatagramPacket p = new DatagramPacket(data, data.length, InetAddress.getLocalHost(), destinationId + 50000); // Instancia novo pacote com porta igual ao id do roteador de destino + 10000
+    DatagramPacket p = new DatagramPacket(data, data.length, InetAddress.getLocalHost(), destinationId + 10000); // Instancia novo pacote com porta igual ao id do roteador de destino + 10000
     this.send(p);
   }
 
