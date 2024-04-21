@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
-class DatagramInfo implements Serializable {
+class DatagramInfo implements Serializable { // Esta classe representa os dados enviados entre os roteadores
   private int id; // Identificador do roteador
   private int[] vector; // Vetor de distâncias (indíce indica o id do roteador e o valor a distância até ele)
 
@@ -40,15 +40,15 @@ class DatagramInfo implements Serializable {
 
 public class Channel extends DatagramSocket { // Canal de comunicação
   private final boolean REMOVE_COLORS = false;
-  private final boolean LOG_ENABLED = false;
-  private final int eliminateProbability = 0;
+  private final boolean LOG_ENABLED = false; // Desativa log de mensagens utilizado para EPs anteriores
+  private final int eliminateProbability = 0; // Esta variável define a probabilidade de uma mensagem ser eliminada
 
   private Random random = new Random();
 
-  private ConcurrentHashMap<String, Integer> sendCount = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, Integer> eliminateCount = new ConcurrentHashMap<>();
+  private ConcurrentHashMap<String, Integer> sendCount = new ConcurrentHashMap<>(); // Contagem de mensagens enviadas para cada destino
+  private ConcurrentHashMap<String, Integer> eliminateCount = new ConcurrentHashMap<>(); // Contagem de mensagens eliminadas para cada destino
 
-  private ConcurrentHashMap<String, Integer> receivedCount = new ConcurrentHashMap<>();
+  private ConcurrentHashMap<String, Integer> receivedCount = new ConcurrentHashMap<>(); // Contagem de mensagens recebidas de cada destino
 
   public Channel(int port) throws SocketException {
     super(port);
@@ -68,7 +68,7 @@ public class Channel extends DatagramSocket { // Canal de comunicação
       data = bos.toByteArray();
     }
 
-    DatagramPacket p = new DatagramPacket(data, data.length, InetAddress.getLocalHost(), destinationId + 10000);
+    DatagramPacket p = new DatagramPacket(data, data.length, InetAddress.getLocalHost(), destinationId + 10000); // Instancia novo pacote com porta igual ao id do roteador de destino + 10000
     this.send(p);
   }
 
@@ -116,7 +116,7 @@ public class Channel extends DatagramSocket { // Canal de comunicação
     map.put(key, map.getOrDefault(key, 0) + 1);
   }
 
-  private void logMessage(DatagramPacket p, String status, boolean received) {
+  private void logMessage(DatagramPacket p, String status, boolean received) { // Loga mensagens enviadas e recebidas
     if(LOG_ENABLED) {
       System.out.printf("%s: %s%n", received ? greenText("Recebida") : blueText("Enviada"), status);
     }

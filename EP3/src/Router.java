@@ -3,31 +3,28 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-// Matar o roteador durante a troca de informações acaba convergindo para um estado desatualizado
-// Aumentar o valor de um link após a convergência não permite a convergência
-
-public class Router extends Thread {
+public class Router extends Thread { // Classe que representa um roteador
   private final boolean REMOVE_COLORS = false;
   private final int DELAY = 0;
   private final int TIMEOUT = 2000;
   
-  private int[] distanceVector;
-  private int[] routingTable;
-  private int myId;
-  private int[] neighbors;
-  private Sender sender;
-  private Receiver receiver;
-  private Spy spy;
-  private Channel channel;
-  private boolean finished = false;
-  private boolean vectorChanged = true;
-  private int sentPacketsCount;
-  private int updateCount = 0;
-  private int routerPadding;
-  private int edgePadding;
-  private String linkToChange;
-  private int newWeight;
-  private int routerToDrop;
+  private int[] distanceVector; // Vetor de distâncias
+  private int[] routingTable; // Tabela de roteamento
+  private int myId; // Identificador do roteador
+  private int[] neighbors; // Vizinhos
+  private Sender sender; // Thread para enviar informações
+  private Receiver receiver; // Thread para receber informações
+  private Spy spy; // Thread para derrubar um roteador ou alterar um link
+  private Channel channel; // Canal de comunicação
+  private boolean finished = false; // Indica se o roteador foi derrubado ou se terminou execução
+  private boolean vectorChanged = true; // Indica se o vetor de distâncias foi alterado
+  private int sentPacketsCount; // Contador de pacotes enviados
+  private int updateCount = 0; // Contador de atualizações no vetor de distâncias (iterações)
+  private int routerPadding; // Tamanho do padding para o id do roteador (para alinhamento na impressão da matriz de adjacência)
+  private int edgePadding; // Tamanho do padding para o peso da conexão (para alinhamento na impressão da matriz de adjacência)
+  private String linkToChange; // Link a ser alterado
+  private int newWeight; // Novo peso do link
+  private int routerToDrop; // Roteador a ser derrubado
 
   public int getUpdateCount() {
     return updateCount;
@@ -67,7 +64,7 @@ public class Router extends Thread {
     }
   }
 
-  private int[] populateInitialRoutingTable(int[] distanceVector) {
+  private int[] populateInitialRoutingTable(int[] distanceVector) { // Preenche a tabela de roteamento inicial
     int[] routingTable = new int[distanceVector.length];
     for (int i = 0; i < distanceVector.length; i++) {
       routingTable[i] = distanceVector[i] == 0 ? 0 : i + 1;
@@ -102,7 +99,7 @@ public class Router extends Thread {
     return neighbors.stream().mapToInt(i -> i).toArray();
   }
 
-  private void calculateNewDistanceVector(DatagramInfo info) {
+  private void calculateNewDistanceVector(DatagramInfo info) { // Calcula o novo vetor de distâncias
     int[] receivedVector = info.getVector();
     log(greenText("Novo vetor de distâncias recebido de [" + String.format("%" + routerPadding + "d", info.getId()) + "]: " + Router.distanceVectortoString(receivedVector, edgePadding)));
     boolean changed = false;
@@ -129,7 +126,7 @@ public class Router extends Thread {
     }
   }
 
-  public void routerDown(int id) {
+  public void routerDown(int id) { // Derruba um roteador
     if(Arrays.stream(neighbors).anyMatch(i -> i == id)) {
       distanceVector[id-1] = 0;
       routingTable[id-1] = 0;
@@ -137,14 +134,14 @@ public class Router extends Thread {
     }
   }
 
-  public void modifyLink(int id, int newWeight) {
+  public void modifyLink(int id, int newWeight) { // Altera o peso de uma conexão
     if(Arrays.stream(neighbors).anyMatch(i -> i == id)) {
       distanceVector[id-1] = newWeight;
       vectorChanged = true;
     }
   }
 
-  public static String distanceVectortoString(int[] vector, int padding) {
+  public static String distanceVectortoString(int[] vector, int padding) { // Converte um vetor de distâncias para string
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < vector.length; i++) {
       sb.append(String.format("%" + padding + "d", vector[i]));
@@ -165,7 +162,7 @@ public class Router extends Thread {
     log(message, false);
   }
 
-  private class Sender extends Thread {
+  private class Sender extends Thread { // Thread para enviar informações para os vizinhos
     @Override
     public void run() {
       while (!finished) {
@@ -194,7 +191,7 @@ public class Router extends Thread {
     }
   }
 
-  private class Receiver extends Thread {
+  private class Receiver extends Thread { // Thread para receber as informações dos outros roteadores
     @Override
     public void run() {
       try {
@@ -213,7 +210,7 @@ public class Router extends Thread {
     }
   }
 
-  private class Spy extends Thread {
+  private class Spy extends Thread { // Esta thread é reponsável por derrubar um roteador ou alterar um link
     @Override
     public void run() {
       try {

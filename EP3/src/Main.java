@@ -7,7 +7,7 @@ import java.util.Scanner;
 public class Main {
   private static Scanner sc = new Scanner(System.in);
 
-  public static void main(String[] args) throws IOException, InterruptedException {
+  public static void main(String[] args) throws IOException, InterruptedException { // Função principal, apresenta o menu e executa o programa
     System.out.println("Deseja ler (0) ou gerar (1) uma tabela de adjacência? (0): ");
     boolean generate = sc.nextLine().equals("1");
     String[] adjacencyTable;
@@ -23,16 +23,16 @@ public class Main {
       String fileName = sc.nextLine();
       fileName = fileName.equals("") ? "adjacency_table.txt" : fileName;
 
-      adjacencyTable = Files.readString(Path.of(fileName)).split("\r\n");
+      adjacencyTable = Files.readString(Path.of(fileName)).split(System.lineSeparator());
     }
 
     run(adjacencyTable);
   }
 
-  private static void run(String[] nodes) throws InterruptedException {
+  private static void run(String[] nodes) throws InterruptedException { // Executa o programa com a tabela de adjacência fornecida
     System.out.println("Deseja alterar um link (1) ou derrubar um roteador (2)? (0 - não): ");
     String opt = sc.nextLine();
-    int option = Integer.parseInt(opt == "" ? "0" : opt);
+    int option = Integer.parseInt(opt.equals("") ? "0" : opt);
 
     int routerToDrop = -1;
     String linkToChange = "";
@@ -96,7 +96,7 @@ public class Main {
     return distanceVector;
   }
 
-  private static String[] generateAdjacencyTable(int n, int percentage) {
+  private static String[] generateAdjacencyTable(int n, int percentage) { // Gera uma tabela de adjacência aleatória
     int[][] adjacencyTable = new int[n][n];
     for (int i = 0; i < n; i++) {
       for (int j = i; j < n; j++) {
